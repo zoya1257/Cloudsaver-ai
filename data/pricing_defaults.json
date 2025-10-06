@@ -1,0 +1,16 @@
+{
+  "us-east-1": {
+    "Lightsail_1_month": 3.5,
+    "EC2_t3_micro_hourly": 0.0104,
+    "EC2_t3_small_hourly": 0.0208,
+    "S3_gb_month": 0.023,
+    "RDS_t3_micro_hourly": 0.034
+  },
+  "ap-south-1": {
+    "Lightsail_1_month": 3.0,
+    "EC2_t3_micro_hourly": 0.012,
+    "EC2_t3_small_hourly": 0.024,
+    "S3_gb_month": 0.026,
+    "RDS_t3_micro_hourly": 0.038
+  }
+}
