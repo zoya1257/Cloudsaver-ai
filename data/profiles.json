@@ -1,0 +1,16 @@
+{
+  "small-web": {
+    "description": "Small website (Lightsail static + small S3)",
+    "components": [
+      { "service": "Lightsail_1_month", "units": 1, "billing": "monthly" },
+      { "service": "S3_gb_month", "units": 20, "billing": "monthly" }
+    ]
+  },
+  "dev-ec2": {
+    "description": "Development server on EC2 + small S3",
+    "components": [
+      { "service": "EC2_t3_small_hourly", "units": 1, "billing": "hourly" },
+      { "service": "S3_gb_month", "units": 10, "billing": "monthly" }
+    ]
+  }
+}
