@@ -1,75 +1,66 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
-import json
-import os
-from typing import Optional
 
-app = FastAPI(title="CloudSaver-AI (MVP)")
+app = FastAPI(title="AWS AI Cost Estimator")
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "..", "data")
-PRICING_PATH = os.path.join(DATA_DIR, "pricing_defaults.json")
-PROFILES_PATH = os.path.join(DATA_DIR, "profiles.json")
-
-# Load static pricing & profiles
-with open(PRICING_PATH, "r") as f:
-    PRICING = json.load(f)
-with open(PROFILES_PATH, "r") as f:
-    PROFILES = json.load(f)
-
-class EstimateRequest(BaseModel):
+# ---------- Data Models ----------
+class CostProfile(BaseModel):
+    service: str
+    usage_hours: float
     region: str
-    profile: str
-    traffic: Optional[str] = None
 
-@app.post("/api/estimate")
-def estimate(payload: EstimateRequest):
-    region = payload.region
-    profile = payload.profile
+# ---------- Estimation Function ----------
+def estimate_cost(service: str, usage_hours: float, region: str):
+    base_rates = {
+        "EC2": 0.12,
+        "S3": 0.023,
+        "Lambda": 0.0000167,
+        "RDS": 0.25
+    }
 
-    if region not in PRICING:
-        raise HTTPException(status_code=400, detail=f"Region '{region}' not supported.")
-    if profile not in PROFILES:
-        raise HTTPException(status_code=400, detail=f"Profile '{profile}' not found.")
+    region_modifier = {
+        "us-east-1": 1.0,
+        "us-west-1": 1.1,
+        "ap-south-1": 0.9,
+        "eu-central-1": 1.2
+    }
 
-    region_prices = PRICING[region]
-    profile_cfg = PROFILES[profile]
-    components = []
-    total_monthly = 0.0
+    service_rate = base_rates.get(service, 0.1)
+    region_factor = region_modifier.get(region, 1.0)
 
-    for comp in profile_cfg.get("components", []):
-        service = comp["service"]
-        units = comp.get("units", 1)
-        billing = comp.get("billing", "monthly")
+    estimated_cost = service_rate * usage_hours * region_factor
+    return estimated_cost
 
-        if service not in region_prices:
-            components.append({
-                "service": service,
-                "note": "Price not found for region"
-            })
-            continue
+# ---------- AI-Like Suggestion Logic ----------
+def suggest_optimization(service: str, usage_hours: float, region: str):
+    suggestions = []
 
-        price = float(region_prices[service])
-        if billing == "hourly":
-            monthly = price * 24 * 30 * units
-            weekly = price * 24 * 7 * units
+    if service == "EC2":
+        if usage_hours > 500:
+            suggestions.append("Consider Reserved Instances or Savings Plans to reduce EC2 cost.")
         else:
-            monthly = price * units
-            weekly = (price / 30.0) * 7.0 * units
+            suggestions.append("Use Spot Instances for short workloads.")
+    elif service == "S3":
+        suggestions.append("Enable S3 Intelligent-Tiering for infrequent access data.")
+    elif service == "Lambda":
+        suggestions.append("Optimize function memory size for best cost-performance ratio.")
+    elif service == "RDS":
+        suggestions.append("Use Aurora Serverless if your DB workload is variable.")
+    else:
+        suggestions.append("Enable Cost Explorer to analyze detailed usage patterns.")
 
-        components.append({
-            "service": service,
-            "monthly": round(monthly, 4),
-            "weekly": round(weekly, 4),
-            "units": units
-        })
-        total_monthly += monthly
+    if region != "us-east-1":
+        suggestions.append("Consider deploying in us-east-1 region for lower base rates.")
 
+    return suggestions
+
+# ---------- API Endpoint ----------
+@app.post("/api/estimate")
+def get_estimate(profile: CostProfile):
+    cost = estimate_cost(profile.service, profile.usage_hours, profile.region)
+    suggestions = suggest_optimization(profile.service, profile.usage_hours, profile.region)
     return {
-        "region": region,
-        "profile": profile,
-        "7d_estimate": round((total_monthly / 30.0) * 7.0, 4),
-        "30d_estimate": round(total_monthly, 4),
-        "components": components,
-        "notes": "Approximate estimates — integrate AWS Pricing API for real data."
+        "estimated_cost": round(cost, 2),
+        "currency": "USD",
+        "suggestions": suggestions
     }
