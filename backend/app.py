@@ -1,66 +1,74 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="AWS AI Cost Estimator")
+# -------------------------------------------------
+# Initialize FastAPI app
+# -------------------------------------------------
+app = FastAPI()
 
-# ---------- Data Models ----------
-class CostProfile(BaseModel):
+# -------------------------------------------------
+# ✅ CORS Configuration for GitHub Codespaces
+# -------------------------------------------------
+# IMPORTANT: Remove the trailing slash (/) in the URL
+# Use your actual frontend Codespace URL below
+origins = [
+    "https://automatic-dollop-jjgpw4v79vxxc5grq-5173.app.github.dev"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,      # Allow only your frontend origin for safety
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# -------------------------------------------------
+# Request Model
+# -------------------------------------------------
+class CostRequest(BaseModel):
     service: str
-    usage_hours: float
+    usage_hours: int
     region: str
 
-# ---------- Estimation Function ----------
-def estimate_cost(service: str, usage_hours: float, region: str):
-    base_rates = {
-        "EC2": 0.12,
-        "S3": 0.023,
-        "Lambda": 0.0000167,
-        "RDS": 0.25
-    }
+# -------------------------------------------------
+# Root Endpoint (Test)
+# -------------------------------------------------
+@app.get("/")
+def root():
+    return {"message": "Backend is running correctly!"}
 
-    region_modifier = {
-        "us-east-1": 1.0,
-        "us-west-1": 1.1,
-        "ap-south-1": 0.9,
-        "eu-central-1": 1.2
-    }
-
-    service_rate = base_rates.get(service, 0.1)
-    region_factor = region_modifier.get(region, 1.0)
-
-    estimated_cost = service_rate * usage_hours * region_factor
-    return estimated_cost
-
-# ---------- AI-Like Suggestion Logic ----------
-def suggest_optimization(service: str, usage_hours: float, region: str):
-    suggestions = []
-
-    if service == "EC2":
-        if usage_hours > 500:
-            suggestions.append("Consider Reserved Instances or Savings Plans to reduce EC2 cost.")
-        else:
-            suggestions.append("Use Spot Instances for short workloads.")
-    elif service == "S3":
-        suggestions.append("Enable S3 Intelligent-Tiering for infrequent access data.")
-    elif service == "Lambda":
-        suggestions.append("Optimize function memory size for best cost-performance ratio.")
-    elif service == "RDS":
-        suggestions.append("Use Aurora Serverless if your DB workload is variable.")
-    else:
-        suggestions.append("Enable Cost Explorer to analyze detailed usage patterns.")
-
-    if region != "us-east-1":
-        suggestions.append("Consider deploying in us-east-1 region for lower base rates.")
-
-    return suggestions
-
-# ---------- API Endpoint ----------
+# -------------------------------------------------
+# POST Endpoint: Cost Estimation
+# -------------------------------------------------
 @app.post("/api/estimate")
-def get_estimate(profile: CostProfile):
-    cost = estimate_cost(profile.service, profile.usage_hours, profile.region)
-    suggestions = suggest_optimization(profile.service, profile.usage_hours, profile.region)
-    return {
-        "estimated_cost": round(cost, 2),
-        "currency": "USD",
-        "suggestions": suggestions
+def estimate_cost(request: CostRequest):
+    # Dummy AWS-like pricing rates
+    rates = {
+        "ec2": 0.12,
+        "s3": 0.023,
+        "lambda": 0.00001667
     }
+
+    # Determine rate based on service (default = 0.10)
+    rate = rates.get(request.service.lower(), 0.10)
+    cost = request.usage_hours * rate
+
+    # Return full structured response
+    return {
+        "service": request.service,
+        "region": request.region,
+        "estimated_cost": f"{cost:.2f}",
+        "currency": "USD",
+        "suggestions": [
+            "Use AWS Free Tier if eligible.",
+            f"Consider using spot instances for {request.service}.",
+            "Monitor cost with AWS Cost Explorer."
+        ]
+    }
+
+# -------------------------------------------------
+# Run Command (for reference)
+# -------------------------------------------------
+# uvicorn app:app --host 0.0.0.0 --port 8001
